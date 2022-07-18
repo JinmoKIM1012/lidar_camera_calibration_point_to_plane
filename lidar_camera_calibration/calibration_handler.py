@@ -38,15 +38,13 @@ class CalibrationHandler:
         all_planes_camera = list()
 
         for (image_file, cloud_file) in zip(tqdm(self._data_loader.all_image_files), self._data_loader.all_cloud_files):
-            plane_camera = self._image_handler.run(image_file)
-            if plane_camera is None:
-                continue
             plane_lidar = self._cloud_handler.run(cloud_file)
             if plane_lidar is None:
                 continue
 
-            all_planes_camera.append(plane_camera)
             all_planes_lidar.append(plane_lidar)
+        
+        all_planes_camera = self._image_handler.run_all()
 
         if len(all_planes_lidar) == 0:
             _logger.warning("failed to extract planes data")
@@ -57,6 +55,7 @@ class CalibrationHandler:
 
         rpy = np.deg2rad(cv2.RQDecomp3x3(transformation_mat[:3, :3])[0])
         tvec = transformation_mat[:3, 3]
+
 
         _logger.info("drawing projected lidar points on image...")
         self._draw_projections_lidar_on_cam(transformation_mat)
@@ -70,10 +69,11 @@ class CalibrationHandler:
             projected_image = self._draw_projection_lidar_on_cam(image_file, cloud_file, transformation_mat)
             if projected_image is None:
                 continue
-            image_file_name = os.path.join("/tmp", "projected_" + image_file.split("/")[-1])
+            image_file_name = os.path.join("./tmp", "projected_" + image_file.split("/")[-1])
             cv2.imwrite(image_file_name, projected_image)
 
     def _draw_projection_lidar_on_cam(self, image_file: str, cloud_file: str, transformation_mat):
+        
         image = cv2.imread(image_file)
         assert image is not None, f"failed to load {image_file}"
 
@@ -83,6 +83,23 @@ class CalibrationHandler:
         plane_lidar = self._cloud_handler.run(cloud_file)
         if plane_lidar is None:
             return None
+        height, width = image.shape[:2]
+        import open3d as o3d
+        pcd = o3d.io.read_point_cloud(cloud_file)
+        file_idx = int(cloud_file[-6:-4])
+        if file_idx >= 8:
+            R = pcd.get_rotation_matrix_from_xyz((0, 0, np.pi))
+            pcd.rotate(R, center=(0, 0, 0))
+        img_points, _ = cv2.projectPoints(
+            np.asarray(pcd.points), rvec, tvec, self._image_handler.camera_info.K, self._image_handler.camera_info.dist_coeffs
+        )
+        
+        valid = np.where(np.asarray(pcd.points)[:,0]>0)[0]
+        
+        color = np.zeros((len(img_points), 3))
+        print(color[len(color) // 3])
+        pcd.colors = o3d.utility.Vector3dVector(color/255)
+        # o3d.visualization.draw_geometries([pcd])
 
         points = plane_lidar.projections
         projected_points, _ = cv2.projectPoints(
@@ -90,14 +107,68 @@ class CalibrationHandler:
         )
         projected_points = projected_points.astype(int).squeeze(axis=1)
 
-        height, width = image.shape[:2]
-        for point in projected_points:
+        img_points = img_points.astype(int).squeeze(axis=1)
+
+        color = np.zeros((len(img_points), 3)) 
+        for i, point in enumerate(img_points):
             x, y = point
+            # print(width, height)
             if x < 0 or x > width - 1:
+                color[i] = np.array([0,0,0])
                 continue
             if y < 0 or y > height - 1:
+                color[i] = np.array([0,0,0])
                 continue
-            image = cv2.circle(image, point, radius=0, color=_GREEN, thickness=10)
+            if i not in valid:
+                continue
+            #import pdb; pdb.set_trace()
+            color[i] = np.flip(image[y, x])
+            # import pdb; pdb.set_trace()
+            # image = cv2.circle(image, point, radius=0, color=_GREEN, thickness=10)
+        # pcd.colors = o3d.utility.Vector3dVector(color/255)
+        # o3d.visualization.draw_geometries([pcd])
+
+        if file_idx == 9:
+            R = pcd.get_rotation_matrix_from_xyz((0, 0, np.pi))
+            pcd.rotate(R, center=(0, 0, 0))
+            lens = 3
+            new_image = image_file[:8] + f'20220711_{lens}/' + image_file[8:] 
+
+            image = cv2.imread(new_image)
+
+            assert image is not None, f"failed to load {image_file}"
+
+            rvec, _ = cv2.Rodrigues(transformation_mat[:3, :3])
+            tvec = transformation_mat[:3, 3]
+
+            height, width = image.shape[:2]
+
+            file_idx = int(cloud_file[-6:-4])
+
+            img_points, _ = cv2.projectPoints(
+                np.asarray(pcd.points), rvec, tvec, self._image_handler.camera_info.K, self._image_handler.camera_info.dist_coeffs
+            )
+            
+            valid = np.where(np.asarray(pcd.points)[:,0]>0)[0]
+
+            img_points = img_points.astype(int).squeeze(axis=1)
+
+            for i, point in enumerate(img_points):
+                x, y = point
+                # print(width, height)
+                if x < 0 or x > width - 1:
+                    continue
+                if y < 0 or y > height - 1:
+                    continue
+                if i not in valid:
+                    continue
+                #import pdb; pdb.set_trace()
+                color[i] = image[y, x]
+                # image = cv2.circle(image, point, radius=0, color=_GREEN, thickness=10)
+            # pcd.colors = o3d.utility.Vector3dVector(color/255)
+        pcd.colors = o3d.utility.Vector3dVector(color/255)
+        o3d.io.write_point_cloud(f'./tmp/{file_idx}.pcd', pcd)
+
 
         return image
 

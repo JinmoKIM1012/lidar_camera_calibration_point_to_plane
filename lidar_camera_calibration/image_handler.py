@@ -2,6 +2,7 @@
 import json
 import logging
 from typing import Optional
+import scipy.io
 
 import cv2
 import numpy as np
@@ -40,7 +41,28 @@ class ImageHandler:
     def camera_info(self):
         return self._camera_info
 
+    def run_all(self):
+        target_name = f'../../babelcalib/data/ov_plane/results/pose_target_3_kb_poses_20220711.mat'
+        target_mat = scipy.io.loadmat(target_name)
+        target_poses = target_mat['model'][0][0][3]
+
+        plane_list = []
+
+        for idx in range(target_poses.shape[2]):
+            pose = target_poses[:, :, idx]
+            rot_mat = pose[:3, :3]
+            tvec = pose[:3, 3].squeeze() / 1000
+            normal_v = rot_mat[:, 2]
+            D = -normal_v.dot(tvec)
+            plane_coefficients = np.array([*normal_v, D], dtype=float)
+            plane_list.append(Plane(plane_coefficients))
+        
+        return plane_list
+
+
     def run(self, image_file: str) -> Optional[Plane]:
+        target_name = f'../../babelcalib/data/ov_plane/results/pose_target_3_kb_poses_20220711.mat'
+        target_mat = scipy.io.loadmat(target_name)
         gray_image = cv2.imread(image_file, 0)
         assert gray_image is not None, f"failed to read gray_image: {image_file}"
         gray_image = cv2.GaussianBlur(gray_image, (5, 5), 0)
