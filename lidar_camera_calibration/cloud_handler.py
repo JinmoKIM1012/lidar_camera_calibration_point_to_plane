@@ -42,20 +42,27 @@ class CloudHandler:
     def run(self, cloud_file: str) -> Optional[Plane]:
         pcd = o3d.io.read_point_cloud(cloud_file)
         # import pdb; pdb.set_trace()
-        file_idx = int(cloud_file[-6:-4])
-        if file_idx >= 8:
-            R = pcd.get_rotation_matrix_from_xyz((0, 0, np.pi))
-            pcd.rotate(R, center=(0, 0, 0))
+
+        #     R = pcd.get_rotation_matrix_from_xyz((0, 0, np.pi))
+        #     pcd.rotate(R, center=(0, 0, 0))
         assert not pcd.is_empty(), f"failed to read {cloud_file}"
 
         #xyz = pcd.point["positions"].numpy()
         pass_through_condition = None
         bounding_box = o3d.geometry.AxisAlignedBoundingBox()
-        bounding_box.min_bound = np.array(self._min_bound)
-        bounding_box.max_bound = np.array(self._max_bound)
+        file_idx = int(cloud_file[-6:-4])
+        if file_idx >= 8:
+            bounding_box.min_bound = np.array(self._min_bound)
+            bounding_box.max_bound = np.array(self._max_bound)
+        else:
+            bounding_box.min_bound = np.array([1.2, -0.3, -0.5])
+            bounding_box.max_bound = np.array([5.0, 1.2, 1])
+
         
         #import pdb; pdb.set_trace()
+        # o3d.visualization.draw_geometries([pcd])
         pcd = pcd.crop(bounding_box)
+        # o3d.visualization.draw_geometries([pcd])
         # for i in np.arange(3):
         #     cur_dimension_condition = (xyz[:, i] >= self._min_bound[i]) & (xyz[:, i] <= self._max_bound[i])
         #     pass_through_condition = (
@@ -108,7 +115,7 @@ class CloudHandler:
         # original.paint_uniform_color([1.0, 0, 1.0])
         # pcd.paint_uniform_color([0, 1.0, 0])
         # pcd_remove.paint_uniform_color([0, 1.0, 1.0])
-        # # vis.add_geometry(original)
+        # vis.add_geometry(original)
         # vis.add_geometry(pcd)
         # vis.add_geometry(pcd_remove)
 

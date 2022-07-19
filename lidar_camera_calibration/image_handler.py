@@ -42,7 +42,7 @@ class ImageHandler:
         return self._camera_info
 
     def run_all(self):
-        target_name = f'../../babelcalib/data/ov_plane/results/pose_target_3_kb_poses_20220711.mat'
+        target_name = f'../../babelcalib/data/ov_plane/results/pose_target_3_kb_poses_20220719.mat'
         target_mat = scipy.io.loadmat(target_name)
         target_poses = target_mat['model'][0][0][3]
 
