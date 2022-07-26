@@ -15,8 +15,8 @@ class DataLoader:
         self.all_image_files = [os.path.join(data_path, image_file) for image_file in all_image_files]
         self.all_cloud_files = [os.path.join(data_path, cloud_file) for cloud_file in all_cloud_files]
 
-        for _file in self.all_image_files:
-            assert os.path.isfile(_file), f"{_file} does not exist"
+        # for _file in self.all_image_files:
+        #     assert os.path.isfile(_file), f"{_file} does not exist"
 
-        for _file in self.all_cloud_files:
-            assert os.path.isfile(_file), f"{_file} does not exist"
+        # for _file in self.all_cloud_files:
+        #     assert os.path.isfile(_file), f"{_file} does not exist"
